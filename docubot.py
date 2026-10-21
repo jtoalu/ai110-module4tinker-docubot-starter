@@ -7,7 +7,7 @@ Core DocuBot class responsible for:
 - Supporting RAG answers when paired with Gemini (Phase 2)
 """
 
-import os
+import os, re
 import glob
 
 class DocuBot:
@@ -65,6 +65,10 @@ class DocuBot:
         """
         index = {}
         # TODO: implement simple indexing
+        for filename, text in documents:
+            tokens = dict.fromkeys(re.findall(r"\w+", text.lower()))
+            for token in tokens:
+                index.setdefault(token, []).append(filename)
         return index
 
     # -----------------------------------------------------------
@@ -82,7 +86,9 @@ class DocuBot:
         - Return the count as the score
         """
         # TODO: implement scoring
-        return 0
+        query_words = set(query.lower().split())
+        text_words = set(text.lower().split())
+        return sum(word in text_words for word in query_words)
 
     def retrieve(self, query, top_k=3):
         """
@@ -93,6 +99,14 @@ class DocuBot:
         """
         results = []
         # TODO: implement retrieval logic
+        scored_results = []
+        for filename, text in self.documents:
+            score = self.score_document(query, text)
+            if score > 0:
+                scored_results.append((score, filename, text))
+
+        scored_results.sort(key=lambda result: result[0], reverse=True)
+        results = [(filename, text) for _, filename, text in scored_results]
         return results[:top_k]
 
     # -----------------------------------------------------------
