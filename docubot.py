@@ -7,10 +7,20 @@ Core DocuBot class responsible for:
 - Supporting RAG answers when paired with Gemini (Phase 2)
 """
 
+from operator import index
+from pydoc import text
 import os, re
 import glob
 
 class DocuBot:
+    SECTION_SIZE = 500
+
+    STOP_WORDS = {
+        "a", "an", "and", "are", "can", "do", "does", "find", "for",
+        "i", "in", "is", "me", "of", "on", "please", "the", "to",
+        "you",
+    }
+
     def __init__(self, docs_folder="docs", llm_client=None):
         """
         docs_folder: directory containing project documentation files
@@ -23,7 +33,35 @@ class DocuBot:
         self.documents = self.load_documents()  # List of (filename, text)
 
         # Build a retrieval index (implemented in Phase 1)
-        self.index = self.build_index(self.documents)
+        # self.index = self.build_index(self.documents)
+
+        self.sections = self.split_documents(self.documents)
+        self.index = self.build_index(self.sections)
+
+    @classmethod
+    def split_text(cls, text):
+        """Split text into paragraphs, breaking long paragraphs into bounded sections."""
+        sections = []
+        for paragraph in re.split(r"\n\s*\n", text.strip()):
+            remaining = paragraph.strip()
+            while len(remaining) > cls.SECTION_SIZE:
+                split_at = remaining.rfind(" ", 0, cls.SECTION_SIZE + 1)
+                if split_at <= 0:
+                    split_at = cls.SECTION_SIZE
+                sections.append(remaining[:split_at].strip())
+                remaining = remaining[split_at:].strip()
+            if remaining:
+                sections.append(remaining)
+        return sections
+
+    @classmethod
+    def split_documents(cls, documents):
+        """Return (filename, section) pairs for all non-empty document sections."""
+        return [
+            (filename, section)
+            for filename, text in documents
+            for section in cls.split_text(text)
+        ]
 
     # -----------------------------------------------------------
     # Document Loading
@@ -48,7 +86,6 @@ class DocuBot:
     # Index Construction (Phase 1)
     # -----------------------------------------------------------
 
-    def build_index(self, documents):
         """
         TODO (Phase 1):
         Build a tiny inverted index mapping lowercase words to the documents
@@ -63,12 +100,14 @@ class DocuBot:
         Keep this simple: split on whitespace, lowercase tokens,
         ignore punctuation if needed.
         """
+
+    def build_index(self, sections):
+        """Map each lowercase word to the document sections containing it."""
         index = {}
-        # TODO: implement simple indexing
-        for filename, text in documents:
-            tokens = dict.fromkeys(re.findall(r"\w+", text.lower()))
+        for filename, section in sections:
+            tokens = dict.fromkeys(re.findall(r"\w+", section.lower()))
             for token in tokens:
-                index.setdefault(token, []).append(filename)
+                index.setdefault(token, []).append((filename, section))
         return index
 
     # -----------------------------------------------------------
@@ -85,9 +124,13 @@ class DocuBot:
         - Count how many appear in the text
         - Return the count as the score
         """
-        # TODO: implement scoring
-        query_words = set(query.lower().split())
-        text_words = set(text.lower().split())
+        """Return the number of distinct query words present in the text."""
+        query_words = {
+            word
+            for word in re.findall(r"\w+", query.lower())
+            if word not in self.STOP_WORDS
+    }
+        text_words = set(re.findall(r"\w+", text.lower()))
         return sum(word in text_words for word in query_words)
 
     def retrieve(self, query, top_k=3):
@@ -97,17 +140,37 @@ class DocuBot:
 
         Return a list of (filename, text) sorted by score descending.
         """
-        results = []
-        # TODO: implement retrieval logic
+        """Return the top matching (filename, section) pairs by relevance."""
+        query_words = {
+            word
+            for word in re.findall(r"\w+", query.lower())
+            if word not in self.STOP_WORDS
+        }
+        if not query_words:
+            return []
+
+        indexed_sections = {
+            section
+            for word in query_words
+            for section in self.index.get(word, [])
+        }
+
         scored_results = []
-        for filename, text in self.documents:
-            score = self.score_document(query, text)
+        for filename, section in self.sections:
+            if (filename, section) not in indexed_sections:
+                continue
+            score = self.score_document(query, section)
             if score > 0:
-                scored_results.append((score, filename, text))
+                scored_results.append((score, filename, section))
 
         scored_results.sort(key=lambda result: result[0], reverse=True)
-        results = [(filename, text) for _, filename, text in scored_results]
-        return results[:top_k]
+        minimum_evidence_score = min(2, len(query_words))
+        if not scored_results or scored_results[0][0] < len(query_words):
+            return []
+        return [
+            (filename, section)
+            for _, filename, section in scored_results[:top_k]
+        ]
 
     # -----------------------------------------------------------
     # Answering Modes
