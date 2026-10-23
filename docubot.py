@@ -165,7 +165,11 @@ class DocuBot:
 
         scored_results.sort(key=lambda result: result[0], reverse=True)
         minimum_evidence_score = min(2, len(query_words))
+        ''' this code is stricter than intended. the app does not return "Where is the auth token generated?"
         if not scored_results or scored_results[0][0] < len(query_words):
+            return []
+        '''
+        if not scored_results or scored_results[0][0] < minimum_evidence_score:
             return []
         return [
             (filename, section)
