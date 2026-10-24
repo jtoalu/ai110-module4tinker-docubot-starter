@@ -17,14 +17,25 @@ Describe the overall goal in 2 to 3 sentences.
 
 > _Your answer here._
 
+- DocuBot is a retrieval-augmented assistant.
+
+It has three features:
+- Naive Generation — the LLM answers with no retrieval (fluent but unreliable).
+- Retrieval Only — a search/ranking system you implement, no LLM.
+- Full RAG — retrieve the most relevant snippets first, then have the LLM answer using only those snippets.
+
 **What inputs does DocuBot take?**  
 For example: user question, docs in folder, environment variables.
 
 > _Your answer here._
 
+DocuBot uses a document corpus and takes either a custom user question or built-in sample questions. At startup, the user chooses naive LLM, retrieval-only, or RAG mode. Gemini-powered modes also require GEMINI_API_KEY in the environment; retrieval-only does not.
+
 **What outputs does DocuBot produce?**
 
 > _Your answer here._
+
+DocuBot displays a generated answer in naive LLM mode, matching source-labeled snippets in retrieval-only mode, or an LLM-generated answer grounded in retrieved snippets in RAG mode. Retrieval-only and RAG return ‘I do not know based on these docs.’ when no snippets meet the retrieval threshold.
 
 ---
 
