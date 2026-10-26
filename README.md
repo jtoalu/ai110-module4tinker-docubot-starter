@@ -50,6 +50,18 @@ Choose a mode:
 
 You can use built in sample queries or type your own.
 
+## Naive Mode
+
+![screenshot of Naive Mode](images/Naive.png)
+
+## Retrieval Mode
+
+![screenshot of Retrieval Mode](images/Retrieval.png)
+
+## RAG Mode
+
+![screenshot of RAG Mode](images/RAG.png)
+
 ---
 
 ## Running Retrieval Evaluation (optional)
